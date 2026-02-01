@@ -1,12 +1,15 @@
-version: '3.8'
-
 services:
   maptoposter:
-    image: ghcr.io/cthonney/maptoposter-docker:latest
-    container_name: maptoposter-docker
+    image: ghcr.io/alivebe-a11y/maptoposter-dock:latest
+    container_name: maptoposter5
     ports:
-      - "5025:5025"
+      - 48580:5025
     volumes:
-      # Local directory to retrieve generated PNGs
-      - ./posters:/app/posters
+      # Output directory for generated posters
+      - /mnt/Pool_1/Home/Map gen:/app/posters
+      # Cache directory (for performance boost)
+      - /mnt/Pool_1/Home/Map gen/@osmnx-cache:/app/cache
+      # Cache manager module (we'll add this file next)
+      - ./cache_manager.py:/app/cache_manager.py
     restart: unless-stopped
+networks: {}
