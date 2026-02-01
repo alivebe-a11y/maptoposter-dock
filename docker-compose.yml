@@ -1,7 +1,7 @@
 services:
   maptoposter:
     image: ghcr.io/alivebe-a11y/maptoposter-dock:latest
-    container_name: maptoposter5
+    container_name: maptoposter10
     ports:
       - 48580:5025
     volumes:
