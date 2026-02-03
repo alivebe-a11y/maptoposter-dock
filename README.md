@@ -11,17 +11,20 @@ Vibe coding with **Google Antigravity** and **Gemini**.⛱️
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
   maptoposter:
-    image: ghcr.io/cthonney/maptoposter-docker:latest
+    image: ghcr.io/alivebe-a11y/maptoposter-dock:latest
     container_name: maptoposter
     ports:
       - "5025:5025"
     volumes:
       # Local directory to retrieve generated PNGs
       - ./posters:/app/posters
+
+      # ADD THESE TWO LINES:
+      - ./cache:/app/cache
+      - ./cache_manager.py:/app/cache_manager.py
+      
     restart: unless-stopped
 ```
 
