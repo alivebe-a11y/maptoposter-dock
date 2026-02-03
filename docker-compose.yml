@@ -7,4 +7,9 @@ services:
     volumes:
       # Local directory to retrieve generated PNGs
       - ./posters:/app/posters
+
+      # ADD THESE TWO LINES:
+      - ./cache:/app/cache
+      - ./cache_manager.py:/app/cache_manager.py
+      
     restart: unless-stopped
