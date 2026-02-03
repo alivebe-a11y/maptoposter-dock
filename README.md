@@ -27,7 +27,19 @@ services:
       
     restart: unless-stopped
 ```
-
+...
+services:
+  maptoposter:
+    build:
+      context: https://github.com/alivebe-a11y/maptoposter-dock.git
+    container_name: maptoposter
+    ports:
+      - "5025:5025"
+    volumes:
+      - ./posters:/app/posters
+      - ./cache:/app/cache
+    restart: unless-stopped
+...
 
 To start the web application:
 
