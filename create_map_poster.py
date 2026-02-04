@@ -203,14 +203,27 @@ def create_gradient_fade(ax, THEME, height_fraction=0.15):
               transform=ax.transAxes, zorder=10)
 
 def create_poster(city, country, theme_name='feature_based', distance=29000, 
-                 width=16, height=20, dpi=500):
+                 width=24, height=34, dpi=500, attribution='BlueBearLabs'):
     """
     Create a map poster with caching support for OSM data.
+    
+    Args:
+        city: City name
+        country: Country name
+        theme_name: Theme to use
+        distance: Map radius in meters
+        width: Poster width in inches (default: 24)
+        height: Poster height in inches (default: 34)
+        dpi: Resolution (default: 500)
+        attribution: Custom attribution text (default: 'BlueBearLabs')
     """
     print(f"\n{'='*60}")
     print(f"Creating poster for {city}, {country}")
     print(f"Theme: {theme_name}")
     print(f"Distance: {distance}m")
+    print(f"Size: {width}x{height} inches")
+    print(f"DPI: {dpi}")
+    print(f"Attribution: {attribution}")
     print(f"{'='*60}\n")
     
     # Load theme
@@ -242,7 +255,7 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
     else:
         # Cache miss - fetch from OSM (slow!)
         print(f"⊙ Fetching OSM data for {city}...")
-        print(f"   This may take 30-60 seconds for the first time...")
+        print(f"   This may take several minutes for the first time...")
         
         # Fetch graph
         print("   → Fetching street network...")
@@ -383,8 +396,8 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
                 transform=ax.transAxes,
                 zorder=11)
         
-        # Attribution
-        ax.text(0.95, 0.02, 'BlueBearLabs',
+        # Attribution - BlueBearLabs (IMPORTANT: Uses attribution variable, NOT hardcoded!)
+        ax.text(0.95, 0.02, attribution,
                 fontproperties=font_light,
                 fontsize=8,
                 color=THEME['text'],
@@ -432,12 +445,15 @@ def main():
                        help='Theme name (default: feature_based)')
     parser.add_argument('-d', '--distance', type=int, default=29000,
                        help='Map radius in meters (default: 29000)')
-    parser.add_argument('--width', type=int, default=16,
-                       help='Poster width in inches (default: 16)')
-    parser.add_argument('--height', type=int, default=20,
-                       help='Poster height in inches (default: 20)')
+    parser.add_argument('--width', type=int, default=24,
+                       help='Poster width in inches (default: 24)')
+    parser.add_argument('--height', type=int, default=34,
+                       help='Poster height in inches (default: 34)')
     parser.add_argument('--dpi', type=int, default=500,
-                       help='Resolution in DPI (default: 300)')
+                       help='Resolution in DPI (default: 500)')
+    parser.add_argument('--attribution', type=str, 
+                       default='BlueBearLabs',
+                       help='Attribution text in bottom right corner (default: BlueBearLabs)')
     parser.add_argument('--list-themes', action='store_true',
                        help='List all available themes')
     
@@ -493,7 +509,8 @@ def main():
         distance=args.distance,
         width=args.width,
         height=args.height,
-        dpi=args.dpi
+        dpi=args.dpi,
+        attribution=args.attribution
     )
 
 if __name__ == "__main__":
