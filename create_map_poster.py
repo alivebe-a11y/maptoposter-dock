@@ -203,7 +203,7 @@ def create_gradient_fade(ax, THEME, height_fraction=0.15):
               transform=ax.transAxes, zorder=10)
 
 def create_poster(city, country, theme_name='feature_based', distance=29000, 
-                 width=16, height=20, dpi=300):
+                 width=16, height=20, dpi=500):
     """
     Create a map poster with caching support for OSM data.
     """
@@ -436,7 +436,7 @@ def main():
                        help='Poster width in inches (default: 16)')
     parser.add_argument('--height', type=int, default=20,
                        help='Poster height in inches (default: 20)')
-    parser.add_argument('--dpi', type=int, default=300,
+    parser.add_argument('--dpi', type=int, default=500,
                        help='Resolution in DPI (default: 300)')
     parser.add_argument('--list-themes', action='store_true',
                        help='List all available themes')
