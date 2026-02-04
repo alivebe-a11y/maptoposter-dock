@@ -12,18 +12,7 @@ Create a `docker-compose.yml` file:
 
 ```yaml
 services:
-  maptoposter:
-    image: ghcr.io/alivebe-a11y/maptoposter-dock:latest
-    container_name: maptoposter
-    ports:
-      - "5025:5025"
-    volumes:
-      # Local directory to retrieve generated PNGs
-      - ./posters:/app/posters
 
-      # ADD THESE TWO LINES:
-      - ./cache:/app/cache
-      - ./cache_manager.py:/app/cache_manager.py
       
     restart: unless-stopped
 ```
