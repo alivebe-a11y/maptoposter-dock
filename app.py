@@ -45,8 +45,8 @@ def generate():
     
     try:
         existing_files = set(glob.glob(os.path.join(POSTER_DIR, "*.png")))
-        # 5-minute timeout
-        subprocess.run(cmd, check=True, timeout=300)
+        # 10-minute timeout (600 seconds)
+        subprocess.run(cmd, check=True, timeout=600)
         
         current_files = set(glob.glob(os.path.join(POSTER_DIR, "*.png")))
         new_files = list(current_files - existing_files)
