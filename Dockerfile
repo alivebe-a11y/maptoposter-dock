@@ -14,12 +14,14 @@ WORKDIR /app
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 3. Ultra-light clone (without history)
+# 3. Ultra-light clone (without history) - FIXED: space before dot
 RUN git clone --depth 1 https://github.com/alivebe-a11y/maptoposter-dock.git .
 
 # 4. Install deps (Works well with Py 3.11)
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 5. Install additional dependencies for caching and stadium features
+RUN pip install --no-cache-dir geopy Pillow
 
 # --- STAGE 2 : RUNTIME (Production) ---
 FROM python:3.11-slim
@@ -39,7 +41,10 @@ COPY --from=builder /app /app
 # 3. Security cleanup
 RUN rm -rf /app/.git
 
-# 4. Config
+# 4. Create cache and badges directories
+RUN mkdir -p /app/cache /app/badges
+
+# 5. Config
 ENV PATH="/opt/venv/bin:$PATH"
 ENV MPLBACKEND=Agg
 
