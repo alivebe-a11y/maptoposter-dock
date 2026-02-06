@@ -14,6 +14,10 @@ import os
 from datetime import datetime
 import argparse
 
+# Stadium features
+from stadium_data import find_stadium, get_stadium_coords, list_stadiums
+from image_overlay import add_badge_overlay, add_stadium_marker
+
 THEMES_DIR = "themes"
 FONTS_DIR = "fonts"
 POSTERS_DIR = "posters"
@@ -39,16 +43,24 @@ def load_fonts():
 
 FONTS = load_fonts()
 
-def generate_output_filename(city, theme_name):
+def generate_output_filename(city, theme_name, stadium_name=None):
     """
-    Generate unique output filename with city, theme, and datetime.
+    Generate unique output filename with city/stadium, theme, and datetime.
     """
     if not os.path.exists(POSTERS_DIR):
         os.makedirs(POSTERS_DIR)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    city_slug = city.lower().replace(' ', '_')
-    filename = f"{city_slug}_{theme_name}_{timestamp}.png"
+    
+    if stadium_name:
+        # Use stadium name for filename
+        name_slug = stadium_name.lower().replace(' ', '_').replace("'", '')
+        filename = f"{name_slug}_{theme_name}_{timestamp}.png"
+    else:
+        # Use city name
+        city_slug = city.lower().replace(' ', '_')
+        filename = f"{city_slug}_{theme_name}_{timestamp}.png"
+    
     return os.path.join(POSTERS_DIR, filename)
 
 def get_available_themes():
@@ -203,7 +215,8 @@ def create_gradient_fade(ax, THEME, height_fraction=0.15):
               transform=ax.transAxes, zorder=10)
 
 def create_poster(city, country, theme_name='feature_based', distance=29000, 
-                 width=24, height=34, dpi=500, attribution='BlueBearLabs'):
+                 width=24, height=34, dpi=500, attribution='BlueBearLabs',
+                 stadium=None, badge_path=None, coords=None, marker_style='star'):
     """
     Create a map poster with caching support for OSM data.
     
@@ -216,14 +229,59 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
         height: Poster height in inches (default: 34)
         dpi: Resolution (default: 500)
         attribution: Custom attribution text (default: 'BlueBearLabs')
+        stadium: Stadium name to center on (optional)
+        badge_path: Path to team badge PNG (optional)
+        coords: Manual coordinates as (lat, lon) tuple (optional)
+        marker_style: Stadium marker style - 'star', 'pin', 'circle', 'crosshair', or None
     """
+    stadium_data = None
+    display_name = city  # For output filename
+    
     print(f"\n{'='*60}")
-    print(f"Creating poster for {city}, {country}")
-    print(f"Theme: {theme_name}")
-    print(f"Distance: {distance}m")
-    print(f"Size: {width}x{height} inches")
-    print(f"DPI: {dpi}")
-    print(f"Attribution: {attribution}")
+    
+    # Get coordinates (priority: coords > stadium > city)
+    if coords:
+        # Manual coordinates provided
+        latitude, longitude = coords
+        print(f"📍 Mode: Manual Coordinates")
+        print(f"📍 Coordinates: {latitude:.4f}, {longitude:.4f}")
+    elif stadium:
+        # Look up stadium
+        stadium_data = find_stadium(stadium)
+        if stadium_data:
+            latitude = stadium_data['lat']
+            longitude = stadium_data['lon']
+            city = stadium_data['city']  # Override city with stadium city
+            country = stadium_data['country']  # Override country
+            display_name = stadium_data['name']  # Use stadium name for display
+            print(f"🏟️  Mode: Stadium")
+            print(f"🏟️  Stadium: {stadium_data['name']}")
+            print(f"⚽  Team: {stadium_data['team']}")
+            print(f"📍 Location: {city}, {country}")
+            print(f"📍 Coordinates: {latitude:.4f}, {longitude:.4f}")
+        else:
+            print(f"⚠️  Stadium '{stadium}' not found in database.")
+            print(f"⚠️  Falling back to city geocoding...")
+            coords_result = get_coordinates(city, country)
+            if coords_result is None:
+                print("✗ Failed to get coordinates. Exiting.")
+                return None
+            latitude, longitude = coords_result
+    else:
+        # Standard city geocoding
+        print(f"🌆 Mode: City")
+        coords_result = get_coordinates(city, country)
+        if coords_result is None:
+            print("✗ Failed to get coordinates. Exiting.")
+            return None
+        latitude, longitude = coords_result
+    
+    print(f"🎨 Theme: {theme_name}")
+    print(f"📏 Distance: {distance}m")
+    print(f"📐 Size: {width}x{height} inches @ {dpi} DPI")
+    print(f"✍️  Attribution: {attribution}")
+    if badge_path:
+        print(f"🎭 Badge: {os.path.basename(badge_path)}")
     print(f"{'='*60}\n")
     
     # Load theme
@@ -232,29 +290,20 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
         print("✗ Failed to load theme. Exiting.")
         return None
     
-    # Get coordinates (with caching)
-    coords = get_coordinates(city, country)
-    if coords is None:
-        print("✗ Failed to get coordinates. Exiting.")
-        return None
-    
-    latitude, longitude = coords
     point = (latitude, longitude)
     
-    print(f"📍 Coordinates: {latitude:.4f}, {longitude:.4f}")
-    
     # Check OSM cache first
-    print(f"\n⊙ Checking OSM data cache...")
+    print(f"⊙ Checking OSM data cache...")
     cached_osm = cache.get_osm_data(latitude, longitude, distance, 'all')
     
     if cached_osm is not None:
-        print(f"✓ Using cached OSM data for {city}")
+        print(f"✓ Using cached OSM data")
         G = cached_osm['graph']
         water = cached_osm['water']
         parks = cached_osm['parks']
     else:
         # Cache miss - fetch from OSM (slow!)
-        print(f"⊙ Fetching OSM data for {city}...")
+        print(f"⊙ Fetching OSM data...")
         print(f"   This may take several minutes for the first time...")
         
         # Fetch graph
@@ -348,6 +397,36 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
         close=False
     )
     
+    # Add badge overlay if provided (BEFORE gradient fades so it's visible)
+    if badge_path and os.path.exists(badge_path):
+        print(f"🎭 Adding badge overlay...")
+        # Position badge at center (where stadium/city is)
+        badge_position = (0.5, 0.5)
+        add_badge_overlay(
+            ax, 
+            badge_path, 
+            position=badge_position,
+            size=0.2,  # 20% of plot size
+            alpha=0.85,
+            glow=True
+        )
+    elif badge_path:
+        print(f"⚠️  Badge file not found: {badge_path}")
+    
+    # Add stadium marker if in stadium mode (and marker style specified)
+    if stadium_data and marker_style:
+        print(f"📍 Adding {marker_style} marker at stadium location...")
+        # Determine marker color based on theme
+        marker_color = THEME.get('text', '#FFFFFF')
+        add_stadium_marker(
+            ax,
+            coords=(0.5, 0.5),  # Center of map
+            color=marker_color,
+            size=400,
+            style=marker_style,
+            alpha=0.9
+        )
+    
     # Add gradient fades
     create_gradient_fade(ax, THEME)
     
@@ -357,9 +436,15 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
         font_regular = FontProperties(fname=FONTS['regular'])
         font_light = FontProperties(fname=FONTS['light'])
         
-        # City name (spaced letters)
-        city_spaced = '  '.join(city.upper())
-        ax.text(0.5, 0.14, city_spaced,
+        # Title text (city name or stadium name)
+        title_text = display_name.upper()
+        if stadium_data:
+            # For stadiums, use stadium name
+            title_text = stadium_data['name'].upper()
+        
+        # City/Stadium name (spaced letters)
+        title_spaced = '  '.join(title_text)
+        ax.text(0.5, 0.14, title_spaced,
                 fontproperties=font_bold,
                 fontsize=88,
                 color=THEME['text'],
@@ -375,8 +460,15 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
                 transform=ax.transAxes,
                 zorder=11)
         
-        # Country name
-        ax.text(0.5, 0.10, country.upper(),
+        # Subtitle (country or team name)
+        if stadium_data:
+            # For stadiums, show team name
+            subtitle = stadium_data['team'].upper()
+        else:
+            # For cities, show country
+            subtitle = country.upper()
+        
+        ax.text(0.5, 0.10, subtitle,
                 fontproperties=font_light,
                 fontsize=38,
                 color=THEME['text'],
@@ -396,10 +488,10 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
                 transform=ax.transAxes,
                 zorder=11)
         
-        # Attribution - BlueBearLabs (IMPORTANT: Uses attribution variable, NOT hardcoded!)
+        # Attribution - BlueBearLabs
         ax.text(0.95, 0.02, attribution,
                 fontproperties=font_light,
-                fontsize=8,
+                fontsize=22,
                 color=THEME['text'],
                 ha='right',
                 va='bottom',
@@ -412,7 +504,11 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
     ax.margins(0)
     
     # Save
-    output_file = generate_output_filename(city, theme_name)
+    output_file = generate_output_filename(
+        city, 
+        theme_name, 
+        stadium_name=stadium_data['name'] if stadium_data else None
+    )
     print(f"💾 Saving to {output_file}...")
     
     plt.savefig(
@@ -433,14 +529,34 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate beautiful minimalist map posters',
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description='Generate beautiful minimalist map posters (cities & stadiums)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # City poster
+  %(prog)s -c "London" -C "UK" -t noir -d 15000
+  
+  # Stadium poster
+  %(prog)s --stadium "Old Trafford" -t noir -d 5000
+  
+  # Stadium with badge
+  %(prog)s --stadium "Old Trafford" --badge /app/badges/manutd.png -t noir -d 5000
+  
+  # Manual coordinates
+  %(prog)s --coords "51.5074,-0.1278" -c "Custom" -C "UK" -t noir -d 10000
+  
+  # List all stadiums
+  %(prog)s --list-stadiums
+        """
     )
     
-    parser.add_argument('-c', '--city', required=True,
-                       help='City name (e.g., "Paris", "New York")')
-    parser.add_argument('-C', '--country', required=True,
-                       help='Country name (e.g., "France", "USA")')
+    # Required for city mode, optional for stadium mode
+    parser.add_argument('-c', '--city', 
+                       help='City name (required for city mode, optional for stadium mode)')
+    parser.add_argument('-C', '--country', 
+                       help='Country name (required for city mode, optional for stadium mode)')
+    
+    # Theme and size
     parser.add_argument('-t', '--theme', default='feature_based',
                        help='Theme name (default: feature_based)')
     parser.add_argument('-d', '--distance', type=int, default=29000,
@@ -454,8 +570,24 @@ def main():
     parser.add_argument('--attribution', type=str, 
                        default='BlueBearLabs',
                        help='Attribution text in bottom right corner (default: BlueBearLabs)')
+    
+    # Stadium-specific arguments
+    parser.add_argument('--stadium', type=str,
+                       help='Stadium name or key to center on (e.g., "Old Trafford", "old_trafford")')
+    parser.add_argument('--badge', type=str,
+                       help='Path to team badge/logo PNG file for overlay')
+    parser.add_argument('--coords', type=str,
+                       help='Manual coordinates as "lat,lon" (e.g., "51.5074,-0.1278")')
+    parser.add_argument('--marker', type=str, 
+                       choices=['star', 'pin', 'circle', 'crosshair', 'none'],
+                       default='star',
+                       help='Stadium marker style (default: star, use "none" for no marker)')
+    
+    # Listing options
     parser.add_argument('--list-themes', action='store_true',
                        help='List all available themes')
+    parser.add_argument('--list-stadiums', action='store_true',
+                       help='List all available stadiums')
     
     # Cache management arguments
     parser.add_argument('--cache-stats', action='store_true',
@@ -466,6 +598,23 @@ def main():
                        help='Remove expired cache files')
     
     args = parser.parse_args()
+    
+    # Handle listing commands
+    if args.list_stadiums:
+        stadiums = list_stadiums()
+        print("\n" + "="*90)
+        print("AVAILABLE STADIUMS")
+        print("="*90)
+        print(f"{'Stadium':<32} {'Team':<30} {'Location':<20} {'Sport':<15}")
+        print("-"*90)
+        for s in stadiums:
+            location = f"{s['city']}, {s['country']}"
+            print(f"{s['name']:<32} {s['team']:<30} {location:<20} {s['sport']:<15}")
+        print("="*90)
+        print(f"\nTotal: {len(stadiums)} stadiums")
+        print("\nUsage: --stadium \"Stadium Name\" or --stadium \"stadium_key\"")
+        print("="*90 + "\n")
+        return
     
     # Handle cache commands
     if args.cache_stats:
@@ -501,16 +650,43 @@ def main():
         print("="*60 + "\n")
         return
     
+    # Validate required arguments
+    if not args.stadium and not args.coords:
+        # City mode - require city and country
+        if not args.city or not args.country:
+            parser.error("City mode requires -c/--city and -C/--country arguments")
+    
+    # Set defaults for stadium mode
+    city = args.city if args.city else "Unknown"
+    country = args.country if args.country else "Unknown"
+    
+    # Parse coordinates if provided
+    coords = None
+    if args.coords:
+        try:
+            lat_str, lon_str = args.coords.split(',')
+            coords = (float(lat_str.strip()), float(lon_str.strip()))
+        except:
+            print(f"✗ Invalid coordinates format. Use: lat,lon (e.g., '51.5074,-0.1278')")
+            return
+    
+    # Parse marker style
+    marker_style = args.marker if args.marker != 'none' else None
+    
     # Create poster
     create_poster(
-        city=args.city,
-        country=args.country,
+        city=city,
+        country=country,
         theme_name=args.theme,
         distance=args.distance,
         width=args.width,
         height=args.height,
         dpi=args.dpi,
-        attribution=args.attribution
+        attribution=args.attribution,
+        stadium=args.stadium,
+        badge_path=args.badge,
+        coords=coords,
+        marker_style=marker_style
     )
 
 if __name__ == "__main__":
