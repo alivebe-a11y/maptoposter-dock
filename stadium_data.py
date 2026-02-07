@@ -8,8 +8,8 @@ STADIUMS = {
     "old_trafford": {
         "name": "Old Trafford",
         "team": "Manchester United",
-        "lat": 53.4631,
-        "lon": -2.2913,
+        "lat": 53.46308416105633, 
+        "lon": -2.291326983641944,
         "city": "Manchester",
         "country": "UK",
         "sport": "football",
