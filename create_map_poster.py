@@ -400,32 +400,37 @@ def create_poster(city, country, theme_name='feature_based', distance=29000,
     # Add badge overlay if provided (BEFORE gradient fades so it's visible)
     if badge_path and os.path.exists(badge_path):
         print(f"🎭 Adding badge overlay...")
-        # Position badge at center (where stadium/city is)
-        badge_position = (0.5, 0.5)
+        # Position badge at actual stadium/city coordinates (center of map)
+        # Using axes fraction (0.5, 0.5) which corresponds to center
+        # Since the map is centered on the lat/lon, this aligns with the location
+        badge_position = (0.5, 0.5)  # Center of axes = center of map = stadium location
         add_badge_overlay(
             ax, 
             badge_path, 
             position=badge_position,
             size=0.2,  # 20% of plot size
             alpha=0.85,
-            glow=True
+            glow=False  # No glow - badge is clear enough
         )
     elif badge_path:
         print(f"⚠️  Badge file not found: {badge_path}")
     
     # Add stadium marker if in stadium mode (and marker style specified)
-    if stadium_data and marker_style:
+    # Skip marker if badge is provided (badge replaces marker)
+    if stadium_data and marker_style and not badge_path:
         print(f"📍 Adding {marker_style} marker at stadium location...")
         # Determine marker color based on theme
         marker_color = THEME.get('text', '#FFFFFF')
         add_stadium_marker(
             ax,
-            coords=(0.5, 0.5),  # Center of map
+            coords=(0.5, 0.5),  # Center of axes = center of map = stadium location
             color=marker_color,
             size=400,
             style=marker_style,
             alpha=0.9
         )
+    elif stadium_data and marker_style and badge_path:
+        print(f"ℹ️  Skipping marker - badge provided instead")
     
     # Add gradient fades
     create_gradient_fade(ax, THEME)
